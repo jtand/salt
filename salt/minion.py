@@ -530,7 +530,9 @@ class SMinion(MinionBase):
         # Clean out the proc directory (default /var/cache/salt/minion/proc)
         if (self.opts.get('file_client', 'remote') == 'remote'
                 or self.opts.get('use_master_when_local', False)):
-            self.eval_master(self.opts, failed=True)
+            LOOP_CLASS.current().run_sync(
+                lambda: self.eval_master(self.opts, failed=True)
+            )
         self.gen_modules(initial_load=True)
 
         # If configured, cache pillar data on the minion
@@ -2567,26 +2569,28 @@ class Matcher(object):
         '''
         Matches based on IP address or CIDR notation
         '''
-
         try:
-            tgt = ipaddress.ip_network(tgt)
-            # Target is a network
-            proto = 'ipv{0}'.format(tgt.version)
-            if proto not in self.opts['grains']:
-                return False
-            else:
-                return salt.utils.network.in_subnet(tgt, self.opts['grains'][proto])
+            # Target is an address?
+            tgt = ipaddress.ip_address(tgt)
         except:  # pylint: disable=bare-except
             try:
-                # Target should be an address
-                proto = 'ipv{0}'.format(ipaddress.ip_address(tgt).version)
-                if proto not in self.opts['grains']:
-                    return False
-                else:
-                    return tgt in self.opts['grains'][proto]
+                # Target is a network?
+                tgt = ipaddress.ip_network(tgt)
             except:  # pylint: disable=bare-except
-                log.error('Invalid IP/CIDR target {0}"'.format(tgt))
-                return False
+                log.error('Invalid IP/CIDR target: {0}'.format(tgt))
+                return []
+        proto = 'ipv{0}'.format(tgt.version)
+
+        grains = self.opts['grains']
+
+        if proto not in grains:
+            match = False
+        elif isinstance(tgt, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
+            match = str(tgt) in grains[proto]
+        else:
+            match = salt.utils.network.in_subnet(tgt, grains[proto])
+
+        return match
 
     def range_match(self, tgt):
         '''

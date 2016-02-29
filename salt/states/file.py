@@ -1104,6 +1104,7 @@ def managed(name,
             allow_empty=True,
             follow_symlinks=True,
             check_cmd=None,
+            skip_verify=False,
             **kwargs):
     '''
     Manage a given file, this function allows for a file to be downloaded from
@@ -1388,11 +1389,11 @@ def managed(name,
     check_cmd
         .. versionadded:: 2014.7.0
 
-        The specified command will be run with an appended argument of a *temporary*
-        file containing the new managed contents.  If the command exits with a zero
-        status the new managed contents will be written to the managed destination.
-        If the command exits with a nonzero exit code, the state will fail and
-        no changes will be made to the file.
+        The specified command will be run with an appended argument of a
+        *temporary* file containing the new managed contents.  If the command
+        exits with a zero status the new managed contents will be written to
+        the managed destination. If the command exits with a nonzero exit
+        code, the state will fail and no changes will be made to the file.
 
         For example, the following could be used to verify sudoers before making
         changes:
@@ -1410,6 +1411,13 @@ def managed(name,
 
         **NOTE**: This ``check_cmd`` functions differently than the requisite
         ``check_cmd``.
+
+    skip_verify : False
+        If ``True``, hash verification of remote file sources (``http://``,
+        ``https://``, ``ftp://``) will be skipped, and the ``source_hash``
+        argument will be ignored.
+
+        .. versionadded:: 2016.3.0
     '''
     name = os.path.expanduser(name)
 
@@ -1585,6 +1593,7 @@ def managed(name,
             defaults,
             __env__,
             contents,
+            skip_verify,
             **kwargs
         )
     else:
@@ -1637,6 +1646,7 @@ def managed(name,
             __env__,
             context,
             defaults,
+            skip_verify,
             **kwargs
         )
     except Exception as exc:
@@ -1678,7 +1688,8 @@ def managed(name,
                 show_diff,
                 contents,
                 dir_mode,
-                follow_symlinks)
+                follow_symlinks,
+                skip_verify)
         except Exception as exc:
             ret['changes'] = {}
             log.debug(traceback.format_exc())
@@ -1734,7 +1745,8 @@ def managed(name,
                 show_diff,
                 contents,
                 dir_mode,
-                follow_symlinks)
+                follow_symlinks,
+                skip_verify)
         except Exception as exc:
             ret['changes'] = {}
             log.debug(traceback.format_exc())
@@ -2577,13 +2589,67 @@ def line(name, content, match=None, mode=None, location=None,
 
     .. versionadded:: 2015.8.0
 
-    Params are identical to the remote execution function
-    :mod:`file.line <salt.modules.file.line>`.
+    :param name:
+        Filesystem path to the file to be edited.
+
+    :param content:
+        Content of the line.
+
+    :param match:
+        Match the target line for an action by
+        a fragment of a string or regular expression.
+
+    :param mode:
+        :Ensure:
+            If line does not exist, it will be added.
+
+        :Replace:
+            If line already exist, it will be replaced.
+
+        :Delete:
+            Delete the line, once found.
+
+        :Insert:
+            Insert a line.
+
+    :param location:
+        :start:
+            Place the content at the beginning of the file.
+
+        :end:
+            Place the content at the end of the file.
+
+    :param before:
+        Regular expression or an exact case-sensitive fragment of the string.
+
+    :param after:
+        Regular expression or an exact case-sensitive fragment of the string.
+
+    :param show_changes:
+        Output a unified diff of the old file and the new file.
+        If ``False`` return a boolean if any changes were made.
+        Default is ``True``
+
+        .. note::
+            Using this option will store two copies of the file in-memory
+            (the original version and the edited version) in order to generate the diff.
+
+    :param backup:
+        Create a backup of the original file with the extension:
+        "Year-Month-Day-Hour-Minutes-Seconds".
+
+    :param quiet:
+        Do not raise any exceptions. E.g. ignore the fact that the file that is
+        tried to be edited does not exist and nothing really happened.
+
+    :param indent:
+        Keep indentation with the previous line.
 
     .. code-block: yaml
 
-       /etc/myconfig.conf:
+       update_config:
          file.line:
+           - name: /etc/myconfig.conf
            - mode: ensure
            - content: my key = my value
            - before: somekey.*?
@@ -4512,6 +4578,7 @@ def serialize(name,
             defaults=None,
             saltenv=__env__,
             contents=contents,
+            skip_verify=False,
             **kwargs
         )
 

@@ -106,6 +106,15 @@ class SaltTestsuiteParser(SaltCoverageTestingParser):
             help='Run tests for client'
         )
         self.test_selection_group.add_option(
+            '-G',
+            '--grains',
+            '--grains-tests',
+            dest='grains',
+            default=False,
+            action='store_true',
+            help='Run tests for grains'
+        )
+        self.test_selection_group.add_option(
             '-s',
             '--shell',
             dest='shell',
@@ -128,6 +137,14 @@ class SaltTestsuiteParser(SaltCoverageTestingParser):
             default=False,
             action='store_true',
             help='Run salt/renderers/*.py tests'
+        )
+        self.test_selection_group.add_option(
+            '--minion',
+            '--minion-tests',
+            dest='minion',
+            default=False,
+            action='store_true',
+            help='Run tests for minion'
         )
         self.test_selection_group.add_option(
             '-l',
@@ -207,6 +224,7 @@ class SaltTestsuiteParser(SaltCoverageTestingParser):
                 self.options.module,
                 self.options.cli,
                 self.options.client,
+                self.options.grains,
                 self.options.shell,
                 self.options.unit,
                 self.options.state,
@@ -218,6 +236,7 @@ class SaltTestsuiteParser(SaltCoverageTestingParser):
                 self.options.fileserver,
                 self.options.wheel,
                 self.options.api,
+                self.options.minion,
                 os.geteuid() != 0,
                 not self.options.run_destructive)):
             self.error(
@@ -228,15 +247,17 @@ class SaltTestsuiteParser(SaltCoverageTestingParser):
             )
 
         # Set test suite defaults if no specific suite options are provided
-        if not any((self.options.module, self.options.client, self.options.cli,
-                    self.options.shell, self.options.unit, self.options.state,
-                    self.options.runners, self.options.loader, self.options.name,
+        if not any((self.options.module, self.options.cli, self.options.client,
+                    self.options.grains, self.options.shell, self.options.unit,
+                    self.options.state, self.options.runners,
+                    self.options.loader, self.options.name,
                     self.options.outputter, self.options.cloud_provider_tests,
                     self.options.fileserver, self.options.wheel, self.options.api,
-                    self.options.renderers)):
+                    self.options.minion, self.options.renderers)):
             self.options.module = True
             self.options.cli = True
             self.options.client = True
+            self.options.grains = True
             self.options.shell = True
             self.options.unit = True
             self.options.runners = True
@@ -247,6 +268,7 @@ class SaltTestsuiteParser(SaltCoverageTestingParser):
             self.options.fileserver = True
             self.options.wheel = True
             self.options.api = True
+            self.options.minion = True
 
         self.start_coverage(
             branch=True,
@@ -364,12 +386,14 @@ class SaltTestsuiteParser(SaltCoverageTestingParser):
                  self.options.module or
                  self.options.cli or
                  self.options.client or
+                 self.options.grains or
                  self.options.loader or
                  self.options.outputter or
                  self.options.fileserver or
                  self.options.wheel or
                  self.options.cloud_provider_tests or
                  self.options.api or
+                 self.options.minion or
                  named_tests):
             # We're either not running any of runners, state, module and client
             # tests, or, we're only running unittests by passing --unit or by
@@ -388,11 +412,14 @@ class SaltTestsuiteParser(SaltCoverageTestingParser):
             print_header(' * Setting up Salt daemons to execute tests', top=False)
 
         status = []
-        if not any([self.options.cli, self.options.client, self.options.module,
-                    self.options.runners, self.options.shell, self.options.state,
-                    self.options.loader, self.options.outputter, self.options.name,
-                    self.options.cloud_provider_tests, self.options.api, self.options.renderers,
-                    self.options.fileserver, self.options.wheel]):
+        if not any([self.options.cli, self.options.client, self.options.grains,
+                    self.options.module, self.options.runners,
+                    self.options.shell, self.options.state,
+                    self.options.loader, self.options.outputter,
+                    self.options.name, self.options.cloud_provider_tests,
+                    self.options.api, self.options.renderers,
+                    self.options.fileserver, self.options.wheel,
+                    self.options.minion]):
             return status
 
         with TestDaemon(self):
@@ -414,6 +441,9 @@ class SaltTestsuiteParser(SaltCoverageTestingParser):
                 status.append(self.run_integration_suite('cli', 'CLI'))
             if self.options.client:
                 status.append(self.run_integration_suite('client', 'Client'))
+            # No grains integration tests at this time, uncomment if we add any
+            #if self.options.grains:
+            #    status.append(self.run_integration_suite('grains', 'Grains'))
             if self.options.shell:
                 status.append(self.run_integration_suite('shell', 'Shell'))
             if self.options.outputter:
@@ -428,6 +458,8 @@ class SaltTestsuiteParser(SaltCoverageTestingParser):
                 status.append(self.run_integration_suite('netapi', 'NetAPI'))
             if self.options.renderers:
                 status.append(self.run_integration_suite('renderers', 'Renderers'))
+            if self.options.minion:
+                status.append(self.run_integration_suite('minion', 'Minion'))
         return status
 
     def run_unit_tests(self):
