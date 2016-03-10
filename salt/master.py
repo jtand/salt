@@ -14,6 +14,7 @@ import sys
 import time
 import errno
 import signal
+import stat
 import logging
 import multiprocessing
 import tempfile
@@ -260,7 +261,13 @@ class Maintenance(SignalHandlingMultiprocessingProcess):
         dfn = os.path.join(self.opts['cachedir'], '.dfn')
         try:
             stats = os.stat(dfn)
-            if stats.st_mode == 0o100400:
+            # Basic Windows permissions don't distinguish between
+            # user/group/all. Check for read-only state instead.
+            if salt.utils.is_windows() and not os.access(dfn, os.W_OK):
+                to_rotate = True
+                # Cannot delete read-only files on Windows.
+                os.chmod(dfn, stat.S_IRUSR | stat.S_IWUSR)
+            elif stats.st_mode == 0o100400:
                 to_rotate = True
             else:
                 log.error('Found dropfile with incorrect permissions, ignoring...')
@@ -668,6 +675,9 @@ class ReqServer(SignalHandlingMultiprocessingProcess):
         dfn = os.path.join(self.opts['cachedir'], '.dfn')
         if os.path.isfile(dfn):
             try:
+                if salt.utils.is_windows() and not os.access(dfn, os.W_OK):
+                    # Cannot delete read-only files on Windows.
+                    os.chmod(dfn, stat.S_IRUSR | stat.S_IWUSR)
                 os.remove(dfn)
             except os.error:
                 pass
@@ -1301,10 +1311,32 @@ class AESFuncs(object):
         '''
         Act on specific events from minions
         '''
+        id_ = load['id']
         if load.get('tag', '') == '_salt_error':
-            log.error('Received minion error from [{minion}]: '
-                      '{data}'.format(minion=load['id'],
-                                      data=load['data']['message']))
+            log.error(
+                'Received minion error from [{minion}]: {data}'
+                .format(minion=id_, data=load['data']['message'])
+            )
+
+        for event in load.get('events', []):
+            event_data = event.get('data', {})
+            if 'minions' in event_data:
+                jid = event_data.get('jid')
+                if not jid:
+                    continue
+                minions = event_data['minions']
+                try:
+                    salt.utils.job.store_minions(
+                        self.opts,
+                        jid,
+                        minions,
+                        mminion=self.mminion,
+                        syndic_id=id_)
+                except (KeyError, salt.exceptions.SaltCacheError) as exc:
+                    log.error(
+                        'Could not add minion(s) {0} for job {1}: {2}'
+                        .format(minions, jid, exc)
+                    )
 
     def _return(self, load):
         '''

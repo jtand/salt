@@ -1473,6 +1473,8 @@ class Cloud(object):
                     if not names:
                         break
                     if vm_name not in names:
+                        if not isinstance(vm_details, dict):
+                            vm_details = {}
                         if 'id' in vm_details and vm_details['id'] in names:
                             vm_name = vm_details['id']
                         else:
@@ -1672,7 +1674,11 @@ class Map(Cloud):
                         if driver not in interpolated_map[alias]:
                             interpolated_map[alias][driver] = {}
                         interpolated_map[alias][driver][vm_name] = vm_details
-                        names.remove(vm_name)
+                        try:
+                            names.remove(vm_name)
+                        except KeyError:
+                            # If it's not there, then our job is already done
+                            pass
 
             if not names:
                 continue
@@ -1771,7 +1777,7 @@ class Map(Cloud):
                         #   - bar2
                         mapping = {mapping: None}
                     for name, overrides in six.iteritems(mapping):
-                        if overrides is None:
+                        if overrides is None or isinstance(overrides, bool):
                             # Foo:
                             #   - bar1:
                             #   - bar2:
@@ -1784,7 +1790,7 @@ class Map(Cloud):
                                 'is a reserved word. Please change \'name\' to a different '
                                 'minion id reference.'
                             )
-                            return ''
+                            return {}
                         entries[name] = overrides
                 map_[profile] = entries
                 continue
@@ -2045,7 +2051,7 @@ class Map(Cloud):
             master_temp_pub = salt.utils.mkstemp()
             with salt.utils.fopen(master_temp_pub, 'w') as mtp:
                 mtp.write(pub)
-            master_finger = salt.utils.pem_finger(master_temp_pub)
+            master_finger = salt.utils.pem_finger(master_temp_pub, sum_type=self.opts['hash_type'])
             os.unlink(master_temp_pub)
 
             if master_profile.get('make_minion', True) is True:
@@ -2130,7 +2136,7 @@ class Map(Cloud):
             # mitigate man-in-the-middle attacks
             master_pub = os.path.join(self.opts['pki_dir'], 'master.pub')
             if os.path.isfile(master_pub):
-                master_finger = salt.utils.pem_finger(master_pub)
+                master_finger = salt.utils.pem_finger(master_pub, sum_type=self.opts['hash_type'])
 
         opts = self.opts.copy()
         if self.opts['parallel']:

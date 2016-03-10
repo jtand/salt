@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
 This is a simple proxy-minion designed to connect to and communicate with
-the bottle-based web service contained in https://github.com/salt-contrib/proxyminion_rest_example
+the bottle-based web service contained in https://github.com/saltstack/salt-contrib/tree/master/proxyminion_rest_example
 '''
 from __future__ import absolute_import
 
@@ -129,11 +129,25 @@ def package_install(name, **kwargs):
     Install a "package" on the REST server
     '''
     cmd = DETAILS['url']+'package/install/'+name
-    if 'version' in kwargs:
+    if kwargs.get('version', False):
         cmd += '/'+kwargs['version']
     else:
         cmd += '/1.0'
     r = salt.utils.http.query(cmd, decode_type='json', decode=True)
+    return r['dict']
+
+
+def fix_outage():
+    r = salt.utils.http.query(DETAILS['url']+'fix_outage')
+    return r
+
+
+def uptodate(name):
+
+    '''
+    Call the REST endpoint to see if the packages on the "server" are up to date.
+    '''
+    r = salt.utils.http.query(DETAILS['url']+'package/remove/'+name, decode_type='json', decode=True)
     return r['dict']
 
 
