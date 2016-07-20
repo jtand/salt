@@ -76,7 +76,6 @@ class RunTest(integration.ShellCase, integration.ShellCaseCommonTestsMixIn):
             '--config-dir {0} -d'.format(
                 config_dir
             ),
-            timeout=15,
             catch_stderr=True,
             with_retcode=True
         )
